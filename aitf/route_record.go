@@ -98,3 +98,38 @@ func (record *RouteRecord) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	return 0, nil
 }
+
+/*
+ReadFrom reads a round record from a stream of bytes provided by r
+*/
+func (record *RouteRecord) ReadFrom(r io.Reader) (n int64, err error) {
+	n = 0
+
+	// The first byte in the RR header is the protocol number
+	if err = binary.Read(r, binary.BigEndian, &record.Protocol); err != nil {
+		return
+	}
+
+	// Read the next byte, which is the number of routers in the path, then read
+	// in that many routers.
+	var pathLen uint8
+	if err = binary.Read(r, binary.BigEndian, &pathLen); err != nil {
+		return
+	}
+
+	record.Path = make([]Router, pathLen)
+	for i := range record.Path {
+		var routerAddress [4]byte
+		if err = binary.Read(r, binary.BigEndian, &routerAddress); err != nil {
+			return
+		}
+
+		record.Path[i].Address = net.IP(routerAddress[:])
+
+		if err = binary.Read(r, binary.BigEndian, &record.Path[i].Nonce); err != nil {
+			return
+		}
+	}
+
+	return
+}
