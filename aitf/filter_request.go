@@ -43,6 +43,22 @@ type FilterRequest struct {
 	Flow   RouteRecord
 }
 
+/*Authentic checks if a filter request was made by a host that legitimately
+received traffice through this router.
+
+This is verified by checking each router in the path until a matching one with
+an authentic nonce is found.  If no such router can be found in the path, the
+filter request is assumed to be mmalicious.*/
+func (req *FilterRequest) Authentic() bool {
+	for _, router := range req.Flow.Path {
+		if router.Authentic(req.Dest) {
+			return true
+		}
+	}
+
+	return false
+}
+
 /*
 WriteTo writes a filter request in its binary format into w
 */
