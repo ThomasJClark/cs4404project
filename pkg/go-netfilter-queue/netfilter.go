@@ -32,28 +32,31 @@ package netfilter
 import "C"
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 	"fmt"
 	"unsafe"
+
+	"code.google.com/p/gopacket"
+	"code.google.com/p/gopacket/layers"
 )
 
 type NFPacket struct {
-	Packet         gopacket.Packet
-	verdictChannel chan Verdict
+	Packet        gopacket.Packet
+	resultChannel chan C.struct_NFResult
 }
 
 //Set the verdict for the packet
 func (p *NFPacket) SetVerdict(v Verdict) {
-	p.verdictChannel <- v
+	p.SetResult(v, nil)
 }
 
-//Set the verdict for the packet
-func (p *NFPacket) SetRequeueVerdict(newQueueId uint16) {
-	v := uint(NF_QUEUE)
-	q := (uint(newQueueId) << 16)
-	v = v | q
-	p.verdictChannel <- Verdict(v)
+//Set both the verdict for the packet and a data buffer containing the packet
+//data
+func (p *NFPacket) SetResult(v Verdict, data []byte) {
+	if data == nil {
+		p.resultChannel <- C.struct_NFResult{Verdict: C.uint(v), Data: nil, Len: 0}
+	} else {
+		p.resultChannel <- C.struct_NFResult{Verdict: C.uint(v), Data: (*C.uint8_t)(&data[0]), Len: (C.int)(len(data))}
+	}
 }
 
 type NFQueue struct {
@@ -64,7 +67,7 @@ type NFQueue struct {
 }
 
 //Verdict for a packet
-type Verdict C.uint
+type Verdict C.uint32_t
 
 const (
 	AF_INET = 2
@@ -142,15 +145,15 @@ func (nfq *NFQueue) run() {
 }
 
 //export go_callback
-func go_callback(queueId C.int, data *C.uchar, len C.int, cb *chan NFPacket) Verdict {
+func go_callback(queueId C.int, data *C.uchar, len C.int, cb *chan NFPacket) C.struct_NFResult {
 	xdata := C.GoBytes(unsafe.Pointer(data), len)
 	packet := gopacket.NewPacket(xdata, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	p := NFPacket{verdictChannel: make(chan Verdict), Packet: packet}
+	p := NFPacket{resultChannel: make(chan C.struct_NFResult), Packet: packet}
 	select {
 	case (*cb) <- p:
-		v := <-p.verdictChannel
-		return v
+		r := <-p.resultChannel
+		return r
 	default:
-		return NF_DROP
+		return C.struct_NFResult{Verdict: C.uint(NF_DROP), Data: nil, Len: 0}
 	}
 }
