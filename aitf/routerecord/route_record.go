@@ -1,4 +1,4 @@
-package aitf
+package routerecord
 
 import (
 	"crypto/hmac"

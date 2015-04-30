@@ -1,4 +1,4 @@
-package aitf
+package filter
 
 import (
 	"errors"

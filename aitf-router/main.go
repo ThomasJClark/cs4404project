@@ -7,7 +7,7 @@ import (
 
 	"code.google.com/p/gopacket/layers"
 
-	"github.com/ThomasJClark/cs4404project/aitf"
+	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
 )
 
@@ -50,7 +50,7 @@ func main() {
 			ipHeader := ipLayer.(*layers.IPv4)
 			ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
 			var b bytes.Buffer
-			var rr aitf.RouteRecord
+			var rr routerecord.RouteRecord
 
 			/*Any local loopback packets can be accepted with modification, as they
 			do not actually go through the network. This is most likely to happen
@@ -62,7 +62,7 @@ func main() {
 
 			if ipHeader.Protocol != IPProtocolAITFRouteRecord {
 				/*If the packet does not already have a route record, create one.*/
-				rr = aitf.NewRouteRecord()
+				rr = routerecord.NewRouteRecord()
 				rr.Protocol = uint8(ipHeader.Protocol)
 
 				log.Println("Got", ipHeader.Protocol, "packet from", ipHeader.SrcIP, "WITHOUT route record")
@@ -75,7 +75,7 @@ func main() {
 
 			/*This router is appended to the end of the route record to indicated
 			that is is part of the path that the packet was transmitted along.*/
-			rr.AddRouter(aitf.NewRouter(localIP, ipHeader.DstIP))
+			rr.AddRouter(routerecord.NewRouter(localIP, ipHeader.DstIP))
 
 			/*The total length field of the IP header must be updated to incorporate
 			the new length of the route record, and we must make sure that the
