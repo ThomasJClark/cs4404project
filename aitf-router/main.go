@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"net"
 
@@ -34,6 +33,7 @@ func localIP() net.IP {
 
 func main() {
 	localIP := localIP()
+	log.Println("My IP address is", localIP)
 
 	/*sudo iptables -I FORWARD -j NFQUEUE --queue-num 0*/
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
@@ -46,56 +46,28 @@ func main() {
 	/*Listen for any packets being forwarded by this router and create/update the
 	route record shim layer in each of them.*/
 	for packet := range nfq.GetPackets() {
-		if ipLayer := packet.Packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-			ipHeader := ipLayer.(*layers.IPv4)
-			ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
-			var b bytes.Buffer
-			var rr routerecord.RouteRecord
+		if layer := packet.Packet.Layer(layers.LayerTypeIPv4); layer != nil {
+			ipLayer := layer.(*layers.IPv4)
 
 			/*Any local loopback packets can be accepted with modification, as they
 			do not actually go through the network. This is most likely to happen
 			while testing using an iptables rule that may include loopback traffice.*/
-			if ipHeader.SrcIP.IsLoopback() {
+			if ipLayer.SrcIP.IsLoopback() {
 				packet.SetVerdict(netfilter.NF_ACCEPT)
 				continue
 			}
 
-			if ipHeader.Protocol != IPProtocolAITFRouteRecord {
-				/*If the packet does not already have a route record, create one.*/
-				rr = routerecord.NewRouteRecord()
-				rr.Protocol = uint8(ipHeader.Protocol)
+			if routerecord.Shimmed(ipLayer) {
+				log.Println("Got AITF shimmed packet from", ipLayer.SrcIP)
 
-				log.Println("Got", ipHeader.Protocol, "packet from", ipHeader.SrcIP, "WITHOUT route record")
+				b := routerecord.Unshim(ipLayer)
+				packet.SetResult(netfilter.NF_ACCEPT, b)
 			} else {
-				/*Otherwise, read the existing route record from the packet.*/
-				rr.ReadFrom(ipPayload)
+				log.Println("Got", ipLayer.Protocol, "packet from", ipLayer.SrcIP)
 
-				log.Println("Got", layers.IPProtocol(rr.Protocol), "packet from", ipHeader.SrcIP, "WITH route record")
+				b := routerecord.Shim(ipLayer, routerecord.NewRouter(localIP, ipLayer.DstIP))
+				packet.SetResult(netfilter.NF_REPEAT, b)
 			}
-
-			/*This router is appended to the end of the route record to indicated
-			that is is part of the path that the packet was transmitted along.*/
-			rr.AddRouter(routerecord.NewRouter(localIP, ipHeader.DstIP))
-
-			/*The total length field of the IP header must be updated to incorporate
-			the new length of the route record, and we must make sure that the
-			protocol number is set to indicate a route record. Because of these
-			changes, the IP checksum must also be recomputed.*/
-			totalLength := len(ipLayer.LayerContents()) + rr.Len() + ipPayload.Len()
-			ipLayer.LayerContents()[2] = byte(totalLength >> 8)
-			ipLayer.LayerContents()[3] = byte(totalLength & 0xff)
-			ipLayer.LayerContents()[9] = byte(IPProtocolAITFRouteRecord)
-			ipLayer.LayerContents()[10] = 0
-			ipLayer.LayerContents()[11] = 0
-
-			/*Put the modified shim layer back into the packet, right after the IP
-			header, and accept the packet.*/
-			b.Write(ipLayer.LayerContents())
-			rr.WriteTo(&b)
-			b.Write(ipPayload.Bytes())
-			packet.SetResult(netfilter.NF_ACCEPT, b.Bytes())
-
-			log.Println("Sent", layers.IPProtocol(rr.Protocol), "packet to", ipHeader.DstIP, "WITH route record")
 		}
 	}
 }
