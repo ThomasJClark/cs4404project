@@ -12,7 +12,7 @@ import (
 InstallFilter adds an iptables rule to implement the requested filter. The
 filter will be removed after the specified duration has passed.
 */
-func InstallFilter(req FilterRequest, d time.Duration) error {
+func InstallFilter(req Request, d time.Duration) error {
 	if req.Authentic() {
 		addIPTablesFilter(req.Source, req.Dest)
 		log.Printf("Added filter: (%s) to (%s) for %s", req.Source, req.Dest, d)

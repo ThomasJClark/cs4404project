@@ -32,6 +32,8 @@ func localIP() net.IP {
 }
 
 func main() {
+	//go listenForRequest()
+
 	localIP := localIP()
 	log.Println("My IP address is", localIP)
 

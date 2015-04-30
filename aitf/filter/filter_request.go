@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+
+	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 )
 
 /*
@@ -34,13 +36,13 @@ const (
 	FilterAck
 )
 
-/*FilterRequest contains the information passed around by a victim, routers,
+/*Request contains the information passed around by a victim, routers,
 and an attacker during the process of a filter request.*/
-type FilterRequest struct {
+type Request struct {
 	Type   MessageType
 	Source net.IP /*The alleged attacker*/
 	Dest   net.IP /*The alleged victim*/
-	Flow   RouteRecord
+	Flow   routerecord.RouteRecord
 }
 
 /*Authentic checks if a filter request was made by a host that legitimately
@@ -49,7 +51,7 @@ received traffice through this router.
 This is verified by checking each router in the path until a matching one with
 an authentic nonce is found.  If no such router can be found in the path, the
 filter request is assumed to be mmalicious.*/
-func (req *FilterRequest) Authentic() bool {
+func (req *Request) Authentic() bool {
 	for _, router := range req.Flow.Path {
 		if router.Authentic(req.Dest) {
 			return true
@@ -62,7 +64,7 @@ func (req *FilterRequest) Authentic() bool {
 /*
 WriteTo writes a filter request in its binary format into w
 */
-func (req *FilterRequest) WriteTo(w io.Writer) (n int64, err error) {
+func (req *Request) WriteTo(w io.Writer) (n int64, err error) {
 	binary.Write(w, binary.BigEndian, req.Type)
 	binary.Write(w, binary.BigEndian, req.Source.To4())
 	binary.Write(w, binary.BigEndian, req.Dest.To4())
@@ -74,7 +76,7 @@ func (req *FilterRequest) WriteTo(w io.Writer) (n int64, err error) {
 /*
 ReadFrom reads a filter request from its binary encoding in r
 */
-func (req *FilterRequest) ReadFrom(r io.Reader) (n int64, err error) {
+func (req *Request) ReadFrom(r io.Reader) (n int64, err error) {
 	n = 0
 
 	if err = binary.Read(r, binary.BigEndian, &req.Type); err != nil {
@@ -99,7 +101,7 @@ struct if it is.
 
 Otherwise, ReadCounterConnection returns nil.
 */
-func (req *FilterRequest) ReadCounterConnection(r io.Reader) *CounterConnection {
+func (req *Request) ReadCounterConnection(r io.Reader) *CounterConnection {
 	switch req.Type {
 	case CounterConnectionSyn, CounterConnectionSynAck, CounterConnectionAck:
 		cc := new(CounterConnection)
@@ -115,7 +117,7 @@ func (req *FilterRequest) ReadCounterConnection(r io.Reader) *CounterConnection 
 This is used in part of a three-way handshake between two routers to confirm
 the address of the router forwarding a filter request.*/
 type CounterConnection struct {
-	Req   FilterRequest
+	Req   Request
 	Nonce uint64
 }
 
