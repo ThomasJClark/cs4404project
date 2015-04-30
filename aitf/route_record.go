@@ -87,6 +87,17 @@ func (record *RouteRecord) AddRouter(router Router) {
 }
 
 /*
+Len returns the number of bytes on the wire that the route record takes up,
+without actually writing it to anything. This is used for adjusting the length
+of an IP payload.
+*/
+func (record *RouteRecord) Len() int {
+	//The protocol number and path length take up one byte each, and each router
+	//takes up 12 bytes (4 byte IPv4 address plus an 8 byte nonce).
+	return 2 + 12*len(record.Path)
+}
+
+/*
 WriteTo writes the entire route record in its raw binary header format into w
 */
 func (record *RouteRecord) WriteTo(w io.Writer) (n int64, err error) {
