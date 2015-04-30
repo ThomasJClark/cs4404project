@@ -12,6 +12,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
 	/*Implementing a policy module is outside of the scope of this project.
 	Instead, a comand line flag will indicate weather or not to treat all traffic
 	as if it were an attack.*/

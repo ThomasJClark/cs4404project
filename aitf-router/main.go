@@ -6,6 +6,7 @@ import (
 
 	"code.google.com/p/gopacket/layers"
 
+	"github.com/ThomasJClark/cs4404project/aitf/filter"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
 )
@@ -32,6 +33,8 @@ func localIP() net.IP {
 }
 
 func main() {
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
 	go listenForRequest()
 
 	localIP := localIP()
@@ -48,10 +51,9 @@ func main() {
 	/*Listen for any packets being forwarded by this router and create/update the
 	route record shim layer in each of them.*/
 	for packet := range nfq.GetPackets() {
-		log.Println(packet.Packet)
 		var ipLayer *layers.IPv4
 
-		/* Get the IPv4 layer, or ignore it if it doesn't exist. */
+		/*Get the IPv4 layer, or ignore it if it doesn't exist. */
 		if layer := packet.Packet.Layer(layers.LayerTypeIPv4); layer != nil {
 			ipLayer = layer.(*layers.IPv4)
 		} else {
@@ -64,6 +66,14 @@ func main() {
 		while testing using an iptables rule that may include loopback traffic.*/
 		if ipLayer.SrcIP.IsLoopback() {
 			packet.SetVerdict(netfilter.NF_ACCEPT)
+			continue
+		}
+
+		/*If there's a filter currently in place for the packet, stop right here
+		and drop it.*/
+		if filter.IsFiltered(ipLayer.SrcIP, ipLayer.DstIP) {
+			packet.SetVerdict(netfilter.NF_DROP)
+			log.Println("Filtered packet from", ipLayer.SrcIP, "for", ipLayer.DstIP)
 			continue
 		}
 

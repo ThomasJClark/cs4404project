@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"net"
+	"time"
 
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
 )
@@ -30,20 +31,24 @@ func listenForRequest() {
 
 	buf := make([]byte, 5000)
 	for {
-		log.Println("Waiting for request...")
+		log.Println("Listening for filter request...")
 		n, _, _ := serverConn.ReadFromUDP(buf)
+		log.Println(buf[:n])
 
 		/*Read a filter request from the UDP connection*/
 		var req filter.Request
 		_, err := req.ReadFrom(bytes.NewBuffer(buf[:n]))
 		if err != nil {
 			log.Println(err)
+			continue
 		}
 
-		log.Println(req)
+		/*If the request can be verified as authentic through the nonce value in it,
+		install the requested filter.*/
 		if req.Authentic() {
 			log.Println("Received an authentic request!")
 			log.Println(req)
+			filter.InstallFilter(req, time.Second*5)
 		} else {
 			log.Println("Received a forged request!")
 		}

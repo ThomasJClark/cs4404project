@@ -4,8 +4,11 @@ import (
 	"errors"
 	"log"
 	"net"
-	"os/exec"
 	"time"
+)
+
+var (
+	requests = []*Request{}
 )
 
 /*
@@ -14,12 +17,20 @@ filter will be removed after the specified duration has passed.
 */
 func InstallFilter(req Request, d time.Duration) error {
 	if req.Authentic() {
-		addIPTablesFilter(req.Source, req.Dest)
+		requests = append(requests, &req)
 		log.Printf("Added filter: (%s) to (%s) for %s", req.Source, req.Dest, d)
 
 		go func() {
 			time.Sleep(d)
-			removeIPTablesFilter(req.Source, req.Dest)
+
+			/*Remove the reqest from the array of currently active filters.*/
+			for i, req2 := range requests {
+				if &req == req2 {
+					requests = append(requests[:i], requests[i+1:]...)
+					break
+				}
+			}
+
 			log.Printf("Removed filter: (%s) to (%s)", req.Source, req.Dest)
 		}()
 
@@ -29,17 +40,13 @@ func InstallFilter(req Request, d time.Duration) error {
 	return errors.New("The filter request is not authentic.")
 }
 
-func addIPTablesFilter(source, dest net.IP) error {
-	cmd := exec.Command("iptables", "-A", "INPUT", "-s", source.String(), "-d",
-		dest.String(), "-j", "DROP")
-	return cmd.Run()
-}
-
-/*
-RemoveFilter removes the iptables rule that implements the given filter request
-*/
-func removeIPTablesFilter(source, dest net.IP) error {
-	cmd := exec.Command("iptables", "-D", "INPUT", "-s", source.String(), "-d",
-		dest.String(), "-j", "DROP")
-	return cmd.Run()
+/*IsFiltered returns true if there is currently a filter in place blocking
+the given hosts from communicating in this direction.*/
+func IsFiltered(source, dest net.IP) bool {
+	for _, req := range requests {
+		if req.Source.Equal(source) && req.Dest.Equal(dest) {
+			return true
+		}
+	}
+	return false
 }
