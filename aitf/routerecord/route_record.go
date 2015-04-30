@@ -87,6 +87,25 @@ func (record *RouteRecord) AddRouter(router Router) {
 }
 
 /*
+Authentic checks if the given route record is an authentic record of the path
+of a packet that was transmitted by the calling router.  In other words, at
+least one router along the path in the route record must have a valid nonce.
+
+destinationAddress is the address of the packet is the address of packet that
+sent this route record.  This function is used to verify that this router
+actually forwarded a packet to that address.
+*/
+func (record *RouteRecord) Authentic(destinationAddress net.IP) bool {
+	for _, router := range record.Path {
+		if router.Authentic(destinationAddress) {
+			return true
+		}
+	}
+
+	return false
+}
+
+/*
 Len returns the number of bytes on the wire that the route record takes up,
 without actually writing it to anything. This is used for adjusting the length
 of an IP payload.
