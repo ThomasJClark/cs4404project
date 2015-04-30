@@ -45,7 +45,7 @@ func Shim(ipLayer *layers.IPv4, r Router) {
 }
 
 /*Unshim removes the shim layer from an IPv4 packet, if it's present.*/
-func Unshim(ipLayer *layers.IPv4) {
+func Unshim(ipLayer *layers.IPv4) *RouteRecord {
 	if Shimmed(ipLayer) {
 		/*Remove the route record from the payload*/
 		ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
@@ -56,7 +56,11 @@ func Unshim(ipLayer *layers.IPv4) {
 		ipLayer.Protocol = layers.IPProtocol(rr.Protocol)
 		ipLayer.Checksum = 0
 		ipLayer.Payload = ipPayload.Bytes()
+
+		return &rr
 	}
+
+	return nil
 }
 
 /*Serialize helps to serialize an IPv4 packet that has been tampered with.

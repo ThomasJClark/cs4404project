@@ -2,14 +2,30 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"code.google.com/p/gopacket/layers"
 
+	"github.com/ThomasJClark/cs4404project/aitf/filter"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
 )
 
 func main() {
+	/*Implementing a policy module is outside of the scope of this project.
+	Instead, a comand line flag will indicate weather or not to treat all traffic
+	as if it were an attack.*/
+	var treatAllTrafficAsAttacks bool
+	if len(os.Args) < 2 || os.Args[1] == "false" {
+		log.Println("Treating all traffic as normal.")
+		treatAllTrafficAsAttacks = false
+	} else if os.Args[1] == "true" {
+		treatAllTrafficAsAttacks = true
+		log.Println("Treating all traffic as attacks.")
+	} else {
+		log.Fatal("Invalid option:", os.Args[1])
+	}
+
 	/*sudo iptables -I INPUT -j NFQUEUE --queue-num 0*/
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
 	if err != nil {
@@ -35,7 +51,21 @@ func main() {
 		if routerecord.Shimmed(ipLayer) {
 			/*If the IP layer has a shim, remove it.*/
 			log.Println("Got AITF shimmed packet from", ipLayer.SrcIP)
-			routerecord.Unshim(ipLayer)
+			rr := routerecord.Unshim(ipLayer)
+
+			/*If this is a malicious packet, construct a filter request to stop any
+			future undesired traffic from this flow.*/
+			if treatAllTrafficAsAttacks {
+				log.Println("Malicious packet detected from", ipLayer.SrcIP, "- requesting filter.")
+
+				var req filter.Request
+				req.Type = filter.FilterReq
+				req.Source = ipLayer.SrcIP
+				req.Dest = ipLayer.DstIP
+				req.Flow = *rr
+
+				go sendRequest(req)
+			}
 
 			/*Serialize the IP packet. Assuming this is successful, accept it.*/
 			b, err := routerecord.Serialize(ipLayer)
