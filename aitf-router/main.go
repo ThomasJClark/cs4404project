@@ -46,28 +46,45 @@ func main() {
 	/*Listen for any packets being forwarded by this router and create/update the
 	route record shim layer in each of them.*/
 	for packet := range nfq.GetPackets() {
+		var ipLayer *layers.IPv4
+
+		/* Get the IPv4 layer, or ignore it if it doesn't exist. */
 		if layer := packet.Packet.Layer(layers.LayerTypeIPv4); layer != nil {
-			ipLayer := layer.(*layers.IPv4)
+			ipLayer = layer.(*layers.IPv4)
+		} else {
+			packet.SetResult(netfilter.NF_ACCEPT, nil)
+			continue
+		}
 
-			/*Any local loopback packets can be accepted with modification, as they
-			do not actually go through the network. This is most likely to happen
-			while testing using an iptables rule that may include loopback traffice.*/
-			if ipLayer.SrcIP.IsLoopback() {
-				packet.SetVerdict(netfilter.NF_ACCEPT)
-				continue
-			}
+		/*Any local loopback packets can be accepted with modification, as they
+		do not actually go through the network. This is most likely to happen
+		while testing using an iptables rule that may include loopback traffic.*/
+		if ipLayer.SrcIP.IsLoopback() {
+			packet.SetVerdict(netfilter.NF_ACCEPT)
+			continue
+		}
 
-			if routerecord.Shimmed(ipLayer) {
-				log.Println("Got AITF shimmed packet from", ipLayer.SrcIP)
+		var verdict netfilter.Verdict
 
-				b := routerecord.Unshim(ipLayer)
-				packet.SetResult(netfilter.NF_ACCEPT, b)
-			} else {
-				log.Println("Got", ipLayer.Protocol, "packet from", ipLayer.SrcIP)
+		if routerecord.Shimmed(ipLayer) {
+			/*If the IP layer already has a shim, remove it and forward the packet.*/
+			log.Println("Got AITF shimmed packet from", ipLayer.SrcIP)
+			routerecord.Unshim(ipLayer)
+			verdict = netfilter.NF_ACCEPT
+		} else {
+			/*If the IP layer does not have a shim. add one and repeat the packet.*/
+			log.Println("Got", ipLayer.Protocol, "packet from", ipLayer.SrcIP)
+			routerecord.Shim(ipLayer, routerecord.NewRouter(localIP, ipLayer.DstIP))
+			verdict = netfilter.NF_REPEAT
+		}
 
-				b := routerecord.Shim(ipLayer, routerecord.NewRouter(localIP, ipLayer.DstIP))
-				packet.SetResult(netfilter.NF_REPEAT, b)
-			}
+		/*Serialize the IP packet. Assuming this is successful, accept it.*/
+		b, err := routerecord.Serialize(ipLayer)
+		if err != nil {
+			log.Println(err)
+			packet.SetResult(netfilter.NF_DROP, nil)
+		} else {
+			packet.SetResult(verdict, b)
 		}
 	}
 }

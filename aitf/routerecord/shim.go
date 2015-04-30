@@ -3,6 +3,7 @@ package routerecord
 import (
 	"bytes"
 
+	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 )
 
@@ -17,71 +18,63 @@ func Shimmed(ipLayer *layers.IPv4) bool {
 }
 
 /*Shim inserts the given router into the shim layer route record of the given
-IPv4 packet, creating a new route record if it's not already present. The
-resulting shimmed packet is returned as a byte slice.*/
-func Shim(ipLayer *layers.IPv4, r Router) []byte {
-	ipHeader := bytes.NewBuffer(ipLayer.LayerContents())
+IPv4 packet, creating a new route record if it's not already present.*/
+func Shim(ipLayer *layers.IPv4, r Router) {
 	ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
+	var modifiedIPPayload bytes.Buffer
 
 	var rr RouteRecord
 
 	if Shimmed(ipLayer) {
-		/*Read the existing route record from the packet, if there is one,
-		and add the router to it.*/
 		rr.ReadFrom(ipPayload)
+		ipLayer.Length -= uint16(rr.Len())
 	} else {
-		/*Otherwise, create a new route record.*/
 		rr.Protocol = uint8(ipLayer.Protocol)
 	}
 
-	/*Add the router to the route record and put the route record into a shim
-	layer in the packet.*/
+	/*Add the specified router to the route record and put the record at the
+	beginning of the payload.*/
 	rr.AddRouter(r)
-	return enocdeShimmedPacket(ipHeader, ipPayload, rr)
+	rr.WriteTo(&modifiedIPPayload)
+	ipPayload.WriteTo(&modifiedIPPayload)
+
+	ipLayer.Length += uint16(rr.Len())
+	ipLayer.Protocol = layers.IPProtocol(IPProtocolAITFRouteRecord)
+	ipLayer.Checksum = 0
+	ipLayer.Payload = modifiedIPPayload.Bytes()
 }
 
-/*Unshim removes the shim layer from an IPv4 packet, if it's present. Either
-way, the resulting normal non-shimmed packet data is returned as a byte slice.*/
-func Unshim(ipLayer *layers.IPv4) []byte {
-	ipHeader := bytes.NewBuffer(ipLayer.LayerContents())
-	ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
-
-	/*If the packet has shim layer, read it into a temporary variable to remove
-	it.*/
+/*Unshim removes the shim layer from an IPv4 packet, if it's present.*/
+func Unshim(ipLayer *layers.IPv4) {
 	if Shimmed(ipLayer) {
+		/*Remove the route record from the payload*/
+		ipPayload := bytes.NewBuffer(ipLayer.LayerPayload())
 		var rr RouteRecord
 		rr.ReadFrom(ipPayload)
 
-		totalLength := ipHeader.Len() + ipPayload.Len()
-		ipHeader.Bytes()[2] = byte(totalLength >> 8)
-		ipHeader.Bytes()[3] = byte(totalLength & 0xff)
-		ipHeader.Bytes()[9] = rr.Protocol
-		ipHeader.Bytes()[10] = 0
-		ipHeader.Bytes()[11] = 0
+		ipLayer.Length -= uint16(rr.Len())
+		ipLayer.Protocol = layers.IPProtocol(rr.Protocol)
+		ipLayer.Checksum = 0
+		ipLayer.Payload = ipPayload.Bytes()
 	}
-
-	var b bytes.Buffer
-	ipHeader.WriteTo(&b)
-	ipPayload.WriteTo(&b)
-	return b.Bytes()
 }
 
-func enocdeShimmedPacket(ipHeader, ipPayload *bytes.Buffer, rr RouteRecord) []byte {
-	/*The total length field of the IP header must be updated to incorporate
-	the new length of the route record, and we must make sure that the
-	protocol number is set to indicate a route record. Because of these
-	changes, the IP checksum must also be recomputed.*/
-	totalLength := ipHeader.Len() + rr.Len() + ipPayload.Len()
-	ipHeader.Bytes()[2] = byte(totalLength >> 8)
-	ipHeader.Bytes()[3] = byte(totalLength & 0xff)
-	ipHeader.Bytes()[9] = byte(IPProtocolAITFRouteRecord)
-	ipHeader.Bytes()[10] = 0
-	ipHeader.Bytes()[11] = 0
+/*Serialize helps to serialize an IPv4 packet that has been tampered with.
+The IP checksum is recomputed, and the whole packet is concatenated together
+into a byte slice that can be passed to netfilter.*/
+func Serialize(ipLayer *layers.IPv4) ([]byte, error) {
+	/*Write the IPv4 header into a gopacket buffer*/
+	buf := gopacket.NewSerializeBuffer()
+	err := ipLayer.SerializeTo(buf, gopacket.SerializeOptions{FixLengths: false, ComputeChecksums: true})
+	if err != nil {
+		return nil, err
+	}
 
-	/*Put the shim layer into the middle of the packet, right after the IP header.*/
-	var b bytes.Buffer
-	ipHeader.WriteTo(&b)
-	rr.WriteTo(&b)
-	ipPayload.WriteTo(&b)
-	return b.Bytes()
+	/*Write the gopacket buffer and the payload into a byte buffer, concatenating
+	the entire packet together.*/
+	var buf2 bytes.Buffer
+	buf2.Write(buf.Bytes())
+	buf2.Write(ipLayer.Payload)
+
+	return buf2.Bytes(), nil
 }
