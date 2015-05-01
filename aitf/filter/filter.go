@@ -2,15 +2,12 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 	"log"
-	"net"
+	"os/exec"
 	"time"
 
 	"github.com/ThomasJClark/cs4404project/aitf"
-)
-
-var (
-	requests = []*Request{}
 )
 
 const (
@@ -27,19 +24,45 @@ const (
 /*
 InstallFilter adds a firewall rule to implement the requested filter. The
 filter will be removed after the specified duration has passed.
+
+If forward is true, the rule will block forwarded traffic.  This option is true
+for routers.
+
+This function returns immediately, and the rule is applied and removed
+asynchronously.
 */
-func InstallFilter(req Request, d time.Duration) error {
+func InstallFilter(req Request, d time.Duration, forward bool) error {
 	if req.Authentic() {
-		requests = append(requests, &req)
-		log.Printf("Added filter: (%s to %s) for %s", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP), d)
+		log.Printf("Adding filter: [%s to %s] for %s", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP), d)
 
+		/*Run the iptables command to add the filter in a goroutine so we don't
+		block until it finishes.*/
 		go func() {
-			time.Sleep(d)
-
-			if IsFiltered(req.SrcIP, req.DstIP) {
-				log.Println("Filter timed out.")
-				UninstallFilter(req)
+			var target string
+			if forward {
+				target = "FORWARD"
+			} else {
+				target = "OUTPUT"
 			}
+
+			cmd := exec.Command("iptables",
+				"-I", target,
+				"-s", fmt.Sprintf("%s/32", req.SrcIP),
+				"-d", fmt.Sprintf("%s/32", req.DstIP),
+				"-j", "DROP")
+
+			err := cmd.Run()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			/*Uninstall the filter after sleeping for d*/
+			go func() {
+				time.Sleep(d)
+				log.Println("Filter timed out.")
+				UninstallFilter(req, forward)
+			}()
 		}()
 
 		return nil
@@ -48,26 +71,38 @@ func InstallFilter(req Request, d time.Duration) error {
 	return errors.New("The filter request is not authentic.")
 }
 
-/*UninstallFilter removes the rule associated with the specified filter request
-early.*/
-func UninstallFilter(req Request) {
-	/*Remove the reqest from the array of currently active filters.*/
-	for i, req2 := range requests {
-		if req.SrcIP.Equal(req2.SrcIP) && req.DstIP.Equal(req2.DstIP) {
-			requests = append(requests[:i], requests[i+1:]...)
-			log.Printf("Removed filter: (%s to %s)", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP))
+/*
+UninstallFilter removes the firewall rule associated with the specified filter
+request.
+
+If forward is true, the rule blocks forwarded traffic.  This option is true
+for routers.
+
+This function returns immediately, and the rule is removed asynchronously.
+*/
+func UninstallFilter(req Request, forward bool) {
+	var target string
+	if forward {
+		target = "FORWARD"
+	} else {
+		target = "OUTPUT"
+	}
+
+	/*Run the iptables command to remove the filter.*/
+	cmd := exec.Command("iptables",
+		"-D", target,
+		"-s", fmt.Sprintf("%s/32", req.SrcIP),
+		"-d", fmt.Sprintf("%s/32", req.DstIP),
+		"-j", "DROP")
+
+	go func() {
+		/*If the command fails, it's because the filter has already been removed.
+		This happens all the time, since all temporary filters are automatically
+		removed after a timeout, weather or not they have already been legitimately
+		removed.*/
+		if cmd.Run() == nil {
+			log.Printf("Removing filter: [%s to %s]", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP))
 			return
 		}
-	}
-}
-
-/*IsFiltered returns true if there is currently a filter in place blocking
-the given hosts from communicating in this direction.*/
-func IsFiltered(source, dest net.IP) bool {
-	for _, req := range requests {
-		if req.SrcIP.Equal(source) && req.DstIP.Equal(dest) {
-			return true
-		}
-	}
-	return false
+	}()
 }

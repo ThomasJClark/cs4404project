@@ -6,7 +6,6 @@ import (
 	"code.google.com/p/gopacket/layers"
 
 	"github.com/ThomasJClark/cs4404project/aitf"
-	"github.com/ThomasJClark/cs4404project/aitf/filter"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
 )
@@ -50,14 +49,6 @@ func main() {
 		while testing using an iptables rule that may include loopback traffic.*/
 		if ipLayer.SrcIP.IsLoopback() {
 			packet.SetVerdict(netfilter.NF_ACCEPT)
-			continue
-		}
-
-		/*If there's a filter currently in place for the packet, stop right here
-		and drop it.*/
-		if filter.IsFiltered(ipLayer.SrcIP, ipLayer.DstIP) {
-			packet.SetVerdict(netfilter.NF_DROP)
-			log.Println("Filtered packet from", aitf.Hostname(ipLayer.SrcIP), "for", aitf.Hostname(ipLayer.DstIP))
 			continue
 		}
 

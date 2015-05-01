@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # The victim
-scp $GOPATH/bin/aitf-client* root@10.4.32.1:/root/
 ssh root@10.4.32.1 << EOF
     route add -host 10.4.32.2/32 eth0
     route add -host 10.4.32.3/32 gw 10.4.32.2
@@ -17,7 +16,6 @@ ssh root@10.4.32.1 << EOF
 EOF
 
 # The victim's gateway
-scp $GOPATH/bin/aitf-router* root@10.4.32.2:/root/
 ssh root@10.4.32.2 << EOF
     route add -host 10.4.32.1/32 eth0
     route add -host 10.4.32.3/32 eth0
@@ -35,7 +33,6 @@ ssh root@10.4.32.2 << EOF
 EOF
 
 # The attacker's gateway
-scp $GOPATH/bin/aitf-router* root@10.4.32.3:/root/
 ssh root@10.4.32.3 << EOF
     route add -host 10.4.32.2/32 eth0
     route add -host 10.4.32.4/32 eth0
@@ -53,7 +50,6 @@ ssh root@10.4.32.3 << EOF
 EOF
 
 # The attacker
-scp $GOPATH/bin/aitf-client* root@10.4.32.4:/root/
 ssh root@10.4.32.4 << EOF
     route add -host 10.4.32.3/32 eth0
     route add -host 10.4.32.1/32 gw 10.4.32.3

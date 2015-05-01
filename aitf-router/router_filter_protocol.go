@@ -60,7 +60,7 @@ func listenForFilterRequest() {
 		case filter.FilterReq:
 			/*When we receive a filter request, install a temporary filter and begin
 			a counter-connection with the attacker's router.*/
-			filter.InstallFilter(req, filter.TemporaryFilterTime)
+			filter.InstallFilter(req, filter.TemporaryFilterTime, true)
 
 			req.Type = filter.CounterConnectionSyn
 			req.Send(req.Flow.Path[0].IP)
@@ -92,7 +92,7 @@ func listenForFilterRequest() {
 				delete(handshakes, req.Nonce)
 			}
 
-			filter.InstallFilter(req, filter.TemporaryFilterTime)
+			filter.InstallFilter(req, filter.TemporaryFilterTime, true)
 
 			/*The attacker should be informed of its wrongdoing, and the victim's
 			router should be informed that this router is complying with the
@@ -105,7 +105,7 @@ func listenForFilterRequest() {
 		case filter.FilterAck:
 			/*When we get acknowledgement of compliance with a filter, we can remove
 			our temporary filter. Nobody lies on the internet.*/
-			filter.UninstallFilter(req)
+			filter.UninstallFilter(req, true)
 		}
 	}
 }
