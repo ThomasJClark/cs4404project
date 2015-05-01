@@ -13,9 +13,9 @@ import (
 var handshakes map[uint64](*filter.Request)
 
 /*
-listenForFilterRequest waits for a filter request from a client to come.  Then, if
-verifies the authenticity of the request and takes the appropriate action based
-on the AITF filter request protocol.
+listenForFilterRequest waits for a filter request from a client to come.  Then,
+it verifies the authenticity of the request and takes the appropriate action
+based on the AITF filter request protocol.
 */
 func listenForFilterRequest() {
 	if handshakes == nil {
