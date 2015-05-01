@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 
+	"github.com/ThomasJClark/cs4404project/aitf"
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
 )
 
@@ -37,7 +38,6 @@ func listenForFilterRequest() {
 
 	buf := make([]byte, 5000)
 	for {
-		log.Println("Listening for filter request...")
 		n, addr, _ := serverConn.ReadFromUDP(buf)
 
 		/*Read a request from the UDP connection*/
@@ -54,7 +54,7 @@ func listenForFilterRequest() {
 			continue
 		}
 
-		log.Println("Got", req.Type, "from", addr.IP)
+		log.Println("Got", req.Type, "from", aitf.Hostname(addr.IP))
 
 		switch req.Type {
 		case filter.FilterReq:

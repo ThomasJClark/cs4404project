@@ -23,7 +23,7 @@ func main() {
 	go listenForFilterRequest()
 
 	localIP := aitf.LocalIP()
-	log.Println("My IP address is", localIP)
+	log.Println("My IP address is", aitf.Hostname(localIP))
 
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
 	if err != nil {
@@ -57,14 +57,14 @@ func main() {
 		and drop it.*/
 		if filter.IsFiltered(ipLayer.SrcIP, ipLayer.DstIP) {
 			packet.SetVerdict(netfilter.NF_DROP)
-			log.Println("Filtered packet from", ipLayer.SrcIP, "for", ipLayer.DstIP)
+			log.Println("Filtered packet from", aitf.Hostname(ipLayer.SrcIP), "for", aitf.Hostname(ipLayer.DstIP))
 			continue
 		}
 
 		if routerecord.Shimmed(ipLayer) {
-			log.Println("Got AITF shimmed packet from", ipLayer.SrcIP, "for", ipLayer.DstIP)
+			log.Println("Got AITF shimmed packet from", aitf.Hostname(ipLayer.SrcIP), "for", aitf.Hostname(ipLayer.DstIP))
 		} else {
-			log.Println("Got", ipLayer.Protocol, "packet from", ipLayer.SrcIP, "for", ipLayer.DstIP)
+			log.Println("Got", ipLayer.Protocol, "packet from", aitf.Hostname(ipLayer.SrcIP), "for", aitf.Hostname(ipLayer.DstIP))
 		}
 
 		/*Shim up the packet. One of the assumptions made is that each route knows

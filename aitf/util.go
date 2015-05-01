@@ -1,6 +1,9 @@
 package aitf
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
 
 /*LocalIP returns the IP address of this machine.*/
 func LocalIP() net.IP {
@@ -16,4 +19,16 @@ func LocalIP() net.IP {
 	}
 
 	return nil
+}
+
+/*Hostname returns the hostname of the given IP address if available, or the
+IP address otherwise. If the hostname is found, the IP address is also appended
+in parentheses.*/
+func Hostname(ip net.IP) string {
+	names, err := net.LookupAddr(ip.String())
+	if err != nil || len(names) == 0 {
+		return ip.String()
+	}
+
+	return fmt.Sprintf("%s (%s)", names[0], ip.String())
 }

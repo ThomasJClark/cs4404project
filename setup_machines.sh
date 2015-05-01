@@ -10,6 +10,10 @@ ssh root@10.4.32.1 << EOF
     route del -net 10.0.0.0/8
     iptables -A INPUT -s 10.4.32.0/24 -j NFQUEUE --queue-num 0
     iptables -A INPUT -p icmp -j NFQUEUE --queue-num 0
+    echo '10.4.32.1 victim' >> /etc/hosts
+    echo '10.4.32.2 victim-router' >> /etc/hosts
+    echo '10.4.32.3 attacker-router' >> /etc/hosts
+    echo '10.4.32.4 attacker' >> /etc/hosts
 EOF
 
 # The victim's gateway
@@ -24,6 +28,10 @@ ssh root@10.4.32.2 << EOF
     sysctl -w net.ipv4.conf.all.send_redirects=0
     sysctl -w net.ipv4.conf.eth0.send_redirects=0
     iptables -A FORWARD -d 10.4.32.1,10.4.32.4 -j NFQUEUE --queue-num 0
+    echo '10.4.32.1 victim' >> /etc/hosts
+    echo '10.4.32.2 victim-router' >> /etc/hosts
+    echo '10.4.32.3 attacker-router' >> /etc/hosts
+    echo '10.4.32.4 attacker' >> /etc/hosts
 EOF
 
 # The attacker's gateway
@@ -38,6 +46,10 @@ ssh root@10.4.32.3 << EOF
     sysctl -w net.ipv4.conf.all.send_redirects=0
     sysctl -w net.ipv4.conf.eth0.send_redirects=0
     iptables -A FORWARD -d 10.4.32.1,10.4.32.4 -j NFQUEUE --queue-num 0
+    echo '10.4.32.1 victim' >> /etc/hosts
+    echo '10.4.32.2 victim-router' >> /etc/hosts
+    echo '10.4.32.3 attacker-router' >> /etc/hosts
+    echo '10.4.32.4 attacker' >> /etc/hosts
 EOF
 
 # The attacker
@@ -49,4 +61,8 @@ ssh root@10.4.32.4 << EOF
     route add -host 10.10.128.116/32 eth0
     route del -net 10.0.0.0/8
     iptables -A INPUT -s 10.4.32.0/24 -j NFQUEUE --queue-num 0
+    echo '10.4.32.1 victim' >> /etc/hosts
+    echo '10.4.32.2 victim-router' >> /etc/hosts
+    echo '10.4.32.3 attacker-router' >> /etc/hosts
+    echo '10.4.32.4 attacker' >> /etc/hosts
 EOF

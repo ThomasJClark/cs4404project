@@ -6,6 +6,7 @@ import (
 
 	"code.google.com/p/gopacket/layers"
 
+	"github.com/ThomasJClark/cs4404project/aitf"
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
@@ -51,13 +52,13 @@ func main() {
 
 		if routerecord.Shimmed(ipLayer) {
 			/*If the IP layer has a shim, remove it.*/
-			log.Println("Got AITF shimmed packet from", ipLayer.SrcIP)
+			log.Println("Got AITF shimmed packet from", aitf.Hostname(ipLayer.SrcIP))
 			rr := routerecord.Unshim(ipLayer)
 
 			/*If this is a malicious packet, construct a filter request to stop any
 			future undesired traffic from this flow.*/
 			if treatAllTrafficAsAttacks {
-				log.Println("Malicious packet detected from", ipLayer.SrcIP)
+				log.Println("Malicious packet detected from", aitf.Hostname(ipLayer.SrcIP))
 
 				req := filter.Request{
 					Type:  filter.FilterReq,
@@ -78,7 +79,7 @@ func main() {
 			}
 		} else {
 			/*Any packets without a shim can be accepted as-is.*/
-			log.Println("Got", ipLayer.Protocol, "packet from", ipLayer.SrcIP)
+			log.Println("Got", ipLayer.Protocol, "packet from", aitf.Hostname(ipLayer.SrcIP))
 			packet.SetVerdict(netfilter.NF_ACCEPT)
 		}
 	}

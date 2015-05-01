@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/ThomasJClark/cs4404project/aitf"
 )
 
 var (
@@ -29,7 +31,7 @@ filter will be removed after the specified duration has passed.
 func InstallFilter(req Request, d time.Duration) error {
 	if req.Authentic() {
 		requests = append(requests, &req)
-		log.Printf("Added filter: (%s to %s) for %s", req.SrcIP, req.DstIP, d)
+		log.Printf("Added filter: (%s to %s) for %s", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP), d)
 
 		go func() {
 			time.Sleep(d)
@@ -53,7 +55,7 @@ func UninstallFilter(req Request) {
 	for i, req2 := range requests {
 		if req.SrcIP.Equal(req2.SrcIP) && req.DstIP.Equal(req2.DstIP) {
 			requests = append(requests[:i], requests[i+1:]...)
-			log.Printf("Removed filter: (%s to %s)", req.SrcIP, req.DstIP)
+			log.Printf("Removed filter: (%s to %s)", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP))
 			return
 		}
 	}

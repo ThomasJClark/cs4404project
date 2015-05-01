@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/ThomasJClark/cs4404project/aitf"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 )
 
@@ -125,7 +126,7 @@ Send sends the given filter.Request over UDP port 54321 to the given
 IP address.
 */
 func (req Request) Send(to net.IP) error {
-	log.Println("Sending", req.Type, "to", to)
+	log.Println("Sending", req.Type, "to", aitf.Hostname(to))
 
 	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:54321", to))
 	if err != nil {
