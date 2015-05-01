@@ -2,10 +2,10 @@ package main
 
 import (
 	"log"
-	"net"
 
 	"code.google.com/p/gopacket/layers"
 
+	"github.com/ThomasJClark/cs4404project/aitf"
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 	"github.com/ThomasJClark/cs4404project/pkg/go-netfilter-queue"
@@ -17,27 +17,12 @@ const (
 	IPProtocolAITFRouteRecord layers.IPProtocol = 253
 )
 
-/*Get the local IP address of this router by choosing the first interface
-address that is IPv4 and is not a loopback address.*/
-func localIP() net.IP {
-	addrs, _ := net.InterfaceAddrs()
-	for _, addr := range addrs {
-		ip := addr.(*net.IPNet).IP
-
-		if ip.To4() != nil && !ip.IsLoopback() {
-			return ip
-		}
-	}
-
-	return nil
-}
-
 func main() {
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
 	go listenForFilterRequest()
 
-	localIP := localIP()
+	localIP := aitf.LocalIP()
 	log.Println("My IP address is", localIP)
 
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
