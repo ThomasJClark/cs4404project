@@ -58,15 +58,14 @@ func main() {
 			/*If this is a malicious packet, construct a filter request to stop any
 			future undesired traffic from this flow.*/
 			if treatAllTrafficAsAttacks {
-				log.Println("Malicious packet detected from", ipLayer.SrcIP, "- requesting filter.")
+				log.Println("Malicious packet detected from", ipLayer.SrcIP)
 
 				var req filter.Request
 				req.Type = filter.FilterReq
 				req.Source = ipLayer.SrcIP
 				req.Dest = ipLayer.DstIP
 				req.Flow = *rr
-
-				go sendRequest(req)
+				req.Send(rr.Path[len(rr.Path)-1].Address)
 			}
 
 			/*Serialize the IP packet. Assuming this is successful, accept it.*/

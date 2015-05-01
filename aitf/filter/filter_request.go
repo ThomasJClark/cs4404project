@@ -1,8 +1,11 @@
 package filter
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
@@ -36,12 +39,30 @@ const (
 	FilterAck
 )
 
+func (t MessageType) String() string {
+	switch t {
+	case FilterReq:
+		return "Filter Request"
+	case CounterConnectionSyn:
+		return "Counter-connection SYN"
+	case CounterConnectionSynAck:
+		return "Counter-connection SYN+ACK"
+	case CounterConnectionAck:
+		return "Counter-connection ACK"
+	case FilterAck:
+		return "Filter acknowledgement"
+	}
+
+	return "Unrecognized"
+}
+
 /*Request contains the information passed around by a victim, routers,
 and an attacker during the process of a filter request.*/
 type Request struct {
 	Type   MessageType
 	Source net.IP /*The alleged attacker*/
 	Dest   net.IP /*The alleged victim*/
+	Nonce  uint64 /*Used in the three-way handshake between routers*/
 	Flow   routerecord.RouteRecord
 }
 
@@ -68,6 +89,7 @@ func (req *Request) WriteTo(w io.Writer) (n int64, err error) {
 	binary.Write(w, binary.BigEndian, req.Type)
 	binary.Write(w, binary.BigEndian, req.Source.To4())
 	binary.Write(w, binary.BigEndian, req.Dest.To4())
+	binary.Write(w, binary.BigEndian, req.Nonce)
 	req.Flow.WriteTo(w)
 
 	return 0, nil
@@ -91,44 +113,32 @@ func (req *Request) ReadFrom(r io.Reader) (n int64, err error) {
 	req.Source = net.IP(addresses[:4])
 	req.Dest = net.IP(addresses[4:])
 
+	if err = binary.Read(r, binary.BigEndian, &req.Nonce); err != nil {
+		return
+	}
+
 	return req.Flow.ReadFrom(r)
 }
 
 /*
-ReadCounterConnection checks weather a filter request is part of a
-counter-connection handshake, and reads and returns a full CounterConnection
-struct if it is.
-
-Otherwise, ReadCounterConnection returns nil.
+Send sends the given filter.Request over UDP port 54321 to the given
+IP address.
 */
-func (req *Request) ReadCounterConnection(r io.Reader) *CounterConnection {
-	switch req.Type {
-	case CounterConnectionSyn, CounterConnectionSynAck, CounterConnectionAck:
-		cc := new(CounterConnection)
-		cc.Req = *req
-		binary.Read(r, binary.BigEndian, cc.Nonce)
-		return cc
-	default:
-		return nil
+func (req Request) Send(to net.IP) error {
+	log.Println("Sending", req.Type, "to", to)
+
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:54321", to))
+	if err != nil {
+		return err
 	}
-}
 
-/*A CounterConnection contains an entire filter request as well as a nonce.
-This is used in part of a three-way handshake between two routers to confirm
-the address of the router forwarding a filter request.*/
-type CounterConnection struct {
-	Req   Request
-	Nonce uint64
-}
+	udpConn, err := net.DialUDP("udp", nil, udpAddr)
+	if err != nil {
+		return err
+	}
 
-/*
-WriteTo writes a CounterConnection message in its raw binary format to w.  This
-is the same as writing a filter request, but with a message type indicating
-that it is a counter-connection, and an additional nonce at the end.
-*/
-func (cc *CounterConnection) WriteTo(w io.Writer) (n int64, err error) {
-	cc.Req.WriteTo(w)
-	binary.Write(w, binary.BigEndian, cc.Nonce)
-
-	return 0, nil
+	var b bytes.Buffer
+	req.WriteTo(&b)
+	b.WriteTo(udpConn)
+	return nil
 }

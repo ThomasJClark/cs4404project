@@ -3,19 +3,18 @@
 # The victim
 scp $GOPATH/bin/aitf-client* root@10.4.32.1:/root/
 ssh root@10.4.32.1 << EOF
-    echo y | apt-get install libnetfilter-queue1
     route add -host 10.4.32.2/32 eth0
     route add -host 10.4.32.3/32 gw 10.4.32.2
     route add -host 10.4.32.4/32 gw 10.4.32.2
     route add -host 10.10.128.116/32 eth0
     route del -net 10.0.0.0/8
     iptables -A INPUT -s 10.4.32.0/24 -j NFQUEUE --queue-num 0
+    iptables -A INPUT -p icmp -j NFQUEUE --queue-num 0
 EOF
 
 # The victim's gateway
 scp $GOPATH/bin/aitf-router* root@10.4.32.2:/root/
 ssh root@10.4.32.2 << EOF
-    echo y | apt-get install libnetfilter-queue1
     route add -host 10.4.32.1/32 eth0
     route add -host 10.4.32.3/32 eth0
     route add -host 10.4.32.4/32 gw 10.4.32.3
@@ -30,7 +29,6 @@ EOF
 # The attacker's gateway
 scp $GOPATH/bin/aitf-router* root@10.4.32.3:/root/
 ssh root@10.4.32.3 << EOF
-    echo y | apt-get install libnetfilter-queue1
     route add -host 10.4.32.2/32 eth0
     route add -host 10.4.32.4/32 eth0
     route add -host 10.4.32.1/32 gw 10.4.32.2
@@ -45,7 +43,6 @@ EOF
 # The attacker
 scp $GOPATH/bin/aitf-client* root@10.4.32.4:/root/
 ssh root@10.4.32.4 << EOF
-    echo y | apt-get install libnetfilter-queue1
     route add -host 10.4.32.3/32 eth0
     route add -host 10.4.32.1/32 gw 10.4.32.3
     route add -host 10.4.32.2/32 gw 10.4.32.3
