@@ -33,8 +33,11 @@ func InstallFilter(req Request, d time.Duration) error {
 
 		go func() {
 			time.Sleep(d)
-			UninstallFilter(req)
-			log.Printf("Removed filter: (%s to %s)", req.SrcIP, req.DstIP)
+
+			if IsFiltered(req.SrcIP, req.DstIP) {
+				log.Println("Filter timed out.")
+				UninstallFilter(req)
+			}
 		}()
 
 		return nil
@@ -50,7 +53,8 @@ func UninstallFilter(req Request) {
 	for i, req2 := range requests {
 		if req.SrcIP.Equal(req2.SrcIP) && req.DstIP.Equal(req2.DstIP) {
 			requests = append(requests[:i], requests[i+1:]...)
-			break
+			log.Printf("Removed filter: (%s to %s)", req.SrcIP, req.DstIP)
+			return
 		}
 	}
 }

@@ -67,7 +67,8 @@ func listenForFilterRequest() {
 
 		case filter.CounterConnectionSyn:
 			/*When we get a counter-connection SYN, continue the three-way handshake
-			with a SYN-ACK. We don't install a filter until we get an ACK back.*/
+			with a SYN-ACK. We don't install a filter until we get an ACK back with
+			the right nonce.*/
 			req.Type = filter.CounterConnectionSynAck
 			req.Nonce = uint64(rand.Int63())
 			handshakes[req.Nonce] = &req
@@ -75,8 +76,7 @@ func listenForFilterRequest() {
 
 		case filter.CounterConnectionSynAck:
 			/*When we receive a response to a counter-connection, complete the
-			three-way handshake and remove the temporary filter.*/
-			filter.UninstallFilter(req)
+			three-way handshake.*/
 			req.Type = filter.CounterConnectionAck
 			req.Send(addr.IP)
 
