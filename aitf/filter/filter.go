@@ -29,12 +29,12 @@ filter will be removed after the specified duration has passed.
 func InstallFilter(req Request, d time.Duration) error {
 	if req.Authentic() {
 		requests = append(requests, &req)
-		log.Printf("Added filter: (%s to %s) for %s", req.Source, req.Dest, d)
+		log.Printf("Added filter: (%s to %s) for %s", req.SrcIP, req.DstIP, d)
 
 		go func() {
 			time.Sleep(d)
 			UninstallFilter(req)
-			log.Printf("Removed filter: (%s to %s)", req.Source, req.Dest)
+			log.Printf("Removed filter: (%s to %s)", req.SrcIP, req.DstIP)
 		}()
 
 		return nil
@@ -48,7 +48,7 @@ early.*/
 func UninstallFilter(req Request) {
 	/*Remove the reqest from the array of currently active filters.*/
 	for i, req2 := range requests {
-		if req.Source.Equal(req2.Source) && req.Dest.Equal(req2.Dest) {
+		if req.SrcIP.Equal(req2.SrcIP) && req.DstIP.Equal(req2.DstIP) {
 			requests = append(requests[:i], requests[i+1:]...)
 			break
 		}
@@ -59,7 +59,7 @@ func UninstallFilter(req Request) {
 the given hosts from communicating in this direction.*/
 func IsFiltered(source, dest net.IP) bool {
 	for _, req := range requests {
-		if req.Source.Equal(source) && req.Dest.Equal(dest) {
+		if req.SrcIP.Equal(source) && req.DstIP.Equal(dest) {
 			return true
 		}
 	}

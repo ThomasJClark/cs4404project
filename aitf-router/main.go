@@ -35,12 +35,11 @@ func localIP() net.IP {
 func main() {
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
-	go listenForRequest()
+	go listenForFilterRequest()
 
 	localIP := localIP()
 	log.Println("My IP address is", localIP)
 
-	/*sudo iptables -I FORWARD -j NFQUEUE --queue-num 0*/
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
 	if err != nil {
 		log.Fatal(err)

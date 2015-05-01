@@ -28,7 +28,6 @@ func main() {
 		log.Fatal("Invalid option:", os.Args[1])
 	}
 
-	/*sudo iptables -I INPUT -j NFQUEUE --queue-num 0*/
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
 	if err != nil {
 		log.Fatal(err)
@@ -60,12 +59,13 @@ func main() {
 			if treatAllTrafficAsAttacks {
 				log.Println("Malicious packet detected from", ipLayer.SrcIP)
 
-				var req filter.Request
-				req.Type = filter.FilterReq
-				req.Source = ipLayer.SrcIP
-				req.Dest = ipLayer.DstIP
-				req.Flow = *rr
-				req.Send(rr.Path[len(rr.Path)-1].Address)
+				req := filter.Request{
+					Type:  filter.FilterReq,
+					SrcIP: ipLayer.SrcIP,
+					DstIP: ipLayer.DstIP,
+					Flow:  *rr,
+				}
+				req.Send(rr.Path[len(rr.Path)-1].IP)
 			}
 
 			/*Serialize the IP packet. Assuming this is successful, accept it.*/

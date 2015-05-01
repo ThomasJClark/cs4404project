@@ -34,30 +34,30 @@ The address of the router is stored, as well as a nonce that is used by the
 router to verify that the record is genuine.
 */
 type Router struct {
-	Address net.IP
-	Nonce   [8]byte
+	IP    net.IP
+	Nonce [8]byte
 }
 
 /*
 NewRouter creates and returns a new aitf.Router with a properly calculated
 nonce.  The nonce is determined from the destination address of the packet.
 
-routerAddress must by an IPv4 address.
+routerIP must by an IPv4 address.
 */
-func NewRouter(routerAddress net.IP, destinationAddress net.IP) Router {
-	return Router{Address: routerAddress, Nonce: nonce(destinationAddress)}
+func NewRouter(routerIP net.IP, destinationIP net.IP) Router {
+	return Router{IP: routerIP, Nonce: nonce(destinationIP)}
 }
 
 /*
 Authentic checks if the given router record is an authentic record generated
 from this router.  This is accomplished by checking the keyed hash.
 
-destinationAddress is the address of the packet is the address of packet that
+destinationIP is the address of the packet is the address of packet that
 sent this route record.  This function is used to verify that this router
 actually forwarded a packet to that address.
 */
-func (router *Router) Authentic(destinationAddress net.IP) bool {
-	expectedNonce := nonce(destinationAddress)
+func (router *Router) Authentic(destinationIP net.IP) bool {
+	expectedNonce := nonce(destinationIP)
 	return hmac.Equal(router.Nonce[:], expectedNonce[:])
 }
 
@@ -91,13 +91,13 @@ Authentic checks if the given route record is an authentic record of the path
 of a packet that was transmitted by the calling router.  In other words, at
 least one router along the path in the route record must have a valid nonce.
 
-destinationAddress is the address of the packet is the address of packet that
+destinationIP is the address of the packet is the address of packet that
 sent this route record.  This function is used to verify that this router
 actually forwarded a packet to that address.
 */
-func (record *RouteRecord) Authentic(destinationAddress net.IP) bool {
+func (record *RouteRecord) Authentic(destinationIP net.IP) bool {
 	for _, router := range record.Path {
-		if router.Authentic(destinationAddress) {
+		if router.Authentic(destinationIP) {
 			return true
 		}
 	}
@@ -123,7 +123,7 @@ func (record *RouteRecord) WriteTo(w io.Writer) (n int64, err error) {
 	binary.Write(w, binary.BigEndian, record.Protocol)
 	binary.Write(w, binary.BigEndian, uint8(len(record.Path)))
 	for _, router := range record.Path {
-		binary.Write(w, binary.BigEndian, router.Address.To4())
+		binary.Write(w, binary.BigEndian, router.IP.To4())
 		binary.Write(w, binary.BigEndian, router.Nonce)
 	}
 	return 0, nil
@@ -149,12 +149,12 @@ func (record *RouteRecord) ReadFrom(r io.Reader) (n int64, err error) {
 
 	record.Path = make([]Router, pathLen)
 	for i := range record.Path {
-		var routerAddress [4]byte
-		if err = binary.Read(r, binary.BigEndian, &routerAddress); err != nil {
+		var routerIP [4]byte
+		if err = binary.Read(r, binary.BigEndian, &routerIP); err != nil {
 			return
 		}
 
-		record.Path[i].Address = net.IP(routerAddress[:])
+		record.Path[i].IP = net.IP(routerIP[:])
 
 		if err = binary.Read(r, binary.BigEndian, &record.Path[i].Nonce); err != nil {
 			return

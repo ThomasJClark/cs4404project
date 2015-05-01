@@ -12,11 +12,11 @@ import (
 var handshakes map[uint64](*filter.Request)
 
 /*
-listenForRequest waits for a filter request from a client to come.  Then, if
+listenForFilterRequest waits for a filter request from a client to come.  Then, if
 verifies the authenticity of the request and takes the appropriate action based
 on the AITF filter request protocol.
 */
-func listenForRequest() {
+func listenForFilterRequest() {
 	if handshakes == nil {
 		handshakes = make(map[uint64](*filter.Request))
 	}
@@ -63,7 +63,7 @@ func listenForRequest() {
 			filter.InstallFilter(req, filter.TemporaryFilterTime)
 
 			req.Type = filter.CounterConnectionSyn
-			req.Send(req.Flow.Path[0].Address)
+			req.Send(req.Flow.Path[0].IP)
 
 		case filter.CounterConnectionSyn:
 			/*When we get a counter-connection SYN, continue the three-way handshake
@@ -98,7 +98,7 @@ func listenForRequest() {
 			router should be informed that this router is complying with the
 			request.*/
 			req.Type = filter.FilterReq
-			req.Send(req.Source)
+			req.Send(req.SrcIP)
 			req.Type = filter.FilterAck
 			req.Send(addr.IP)
 

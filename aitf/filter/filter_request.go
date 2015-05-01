@@ -59,11 +59,11 @@ func (t MessageType) String() string {
 /*Request contains the information passed around by a victim, routers,
 and an attacker during the process of a filter request.*/
 type Request struct {
-	Type   MessageType
-	Source net.IP /*The alleged attacker*/
-	Dest   net.IP /*The alleged victim*/
-	Nonce  uint64 /*Used in the three-way handshake between routers*/
-	Flow   routerecord.RouteRecord
+	Type  MessageType
+	SrcIP net.IP /*The alleged attacker*/
+	DstIP net.IP /*The alleged victim*/
+	Nonce uint64 /*Used in the three-way handshake between routers*/
+	Flow  routerecord.RouteRecord
 }
 
 /*Authentic checks if a filter request was made by a host that legitimately
@@ -74,7 +74,7 @@ an authentic nonce is found.  If no such router can be found in the path, the
 filter request is assumed to be mmalicious.*/
 func (req *Request) Authentic() bool {
 	for _, router := range req.Flow.Path {
-		if router.Authentic(req.Dest) {
+		if router.Authentic(req.DstIP) {
 			return true
 		}
 	}
@@ -87,8 +87,8 @@ WriteTo writes a filter request in its binary format into w
 */
 func (req *Request) WriteTo(w io.Writer) (n int64, err error) {
 	binary.Write(w, binary.BigEndian, req.Type)
-	binary.Write(w, binary.BigEndian, req.Source.To4())
-	binary.Write(w, binary.BigEndian, req.Dest.To4())
+	binary.Write(w, binary.BigEndian, req.SrcIP.To4())
+	binary.Write(w, binary.BigEndian, req.DstIP.To4())
 	binary.Write(w, binary.BigEndian, req.Nonce)
 	req.Flow.WriteTo(w)
 
@@ -110,8 +110,8 @@ func (req *Request) ReadFrom(r io.Reader) (n int64, err error) {
 		return
 	}
 
-	req.Source = net.IP(addresses[:4])
-	req.Dest = net.IP(addresses[4:])
+	req.SrcIP = net.IP(addresses[:4])
+	req.DstIP = net.IP(addresses[4:])
 
 	if err = binary.Read(r, binary.BigEndian, &req.Nonce); err != nil {
 		return
