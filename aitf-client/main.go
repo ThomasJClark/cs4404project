@@ -1,8 +1,9 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"os"
+	"net"
 
 	"code.google.com/p/gopacket/layers"
 
@@ -15,20 +16,21 @@ import (
 func main() {
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
-	go listenForFilterRequest(comply)
+	/*Read in the command-line options.*/
+	modeStr := flag.String("mode", "comply", "What to do after receiving a filter request (comply, ignore, or lie)")
+	sendRequests := flag.Bool("sendRequests", false, "Enable the dummy policy module to send filter request. (true or false)")
+	flag.Parse()
 
-	/*Implementing a policy module is outside of the scope of this project.
-	Instead, a comand line flag will indicate weather or not to treat all traffic
-	as if it were an attack.*/
-	var treatAllTrafficAsAttacks bool
-	if len(os.Args) < 2 || os.Args[1] == "false" {
-		log.Println("Treating all traffic as normal.")
-		treatAllTrafficAsAttacks = false
-	} else if os.Args[1] == "true" {
-		treatAllTrafficAsAttacks = true
-		log.Println("Treating all traffic as attacks.")
-	} else {
-		log.Fatal("Invalid option:", os.Args[1])
+	switch *modeStr {
+	case "comply":
+		log.Println("Complying with filtering requests.")
+		go listenForFilterRequest(comply)
+	case "ignore":
+		log.Println("Ignoring filtering requests.")
+		go listenForFilterRequest(ignore)
+	case "lie":
+		log.Println("Pretending to comply with filtering requests.")
+		go listenForFilterRequest(lie)
 	}
 
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
@@ -57,18 +59,21 @@ func main() {
 			log.Println("Got AITF shimmed packet from", aitf.Hostname(ipLayer.SrcIP))
 			rr := routerecord.Unshim(ipLayer)
 
-			/*If this is a malicious packet, construct a filter request to stop any
-			future undesired traffic from this flow.*/
-			if treatAllTrafficAsAttacks {
-				log.Println("Malicious packet detected from", aitf.Hostname(ipLayer.SrcIP))
+			if *sendRequests {
+				/*If this is a malicious packet, construct a filter request to stop any
+				future undesired traffic from this flow. The policy module simply
+				considers any ICMP traffic from the attacker to be "malicous".*/
+				if ipLayer.Protocol == layers.IPProtocolICMPv4 && ipLayer.SrcIP.Equal(net.ParseIP("10.4.32.4")) {
+					log.Println("Malicious packet detected from", aitf.Hostname(ipLayer.SrcIP))
 
-				req := filter.Request{
-					Type:  filter.FilterReq,
-					SrcIP: ipLayer.SrcIP,
-					DstIP: ipLayer.DstIP,
-					Flow:  *rr,
+					req := filter.Request{
+						Type:  filter.FilterReq,
+						SrcIP: ipLayer.SrcIP,
+						DstIP: ipLayer.DstIP,
+						Flow:  *rr,
+					}
+					req.Send(rr.Path[len(rr.Path)-1].IP)
 				}
-				req.Send(rr.Path[len(rr.Path)-1].IP)
 			}
 
 			/*Serialize the IP packet. Assuming this is successful, accept it.*/

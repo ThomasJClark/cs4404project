@@ -9,10 +9,10 @@ import (
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
 )
 
-type filterAction int
+type complianceMode int
 
 const (
-	comply filterAction = iota
+	comply complianceMode = iota
 	ignore
 	lie
 )
@@ -23,11 +23,11 @@ it verifies the authenticity of the request and takes some action.
 
 If action is comply, it filters the attack.
 
-If action is ignore, it logs the request but does nothing about it.
+If action is ignore, it logs the request but does nothing about it.comply
 
 If action is lie, it complies with the request but doesn't actually add a filter.
 */
-func listenForFilterRequest(action filterAction) {
+func listenForFilterRequest(mode complianceMode) {
 	/*Open up a UDP server on the filter request port and handle any messages
 	that arrive.*/
 	serverAddr, err := net.ResolveUDPAddr("udp", ":54321")
@@ -56,7 +56,7 @@ func listenForFilterRequest(action filterAction) {
 
 		log.Println("Got", req.Type, "from", aitf.Hostname(addr.IP))
 		if req.Type == filter.FilterReq {
-			switch action {
+			switch mode {
 			case comply:
 				log.Println("Complying with filter request...")
 
