@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
 )
 
 func main() {
@@ -11,6 +12,7 @@ func main() {
 	/*Read in the command-line options.*/
 	modeStr := flag.String("mode", "comply", "What to do after receiving a filter request (comply, ignore, or lie)")
 	sendRequests := flag.Bool("sendRequests", false, "Enable the dummy policy module to send filter request. (true or false)")
+	fakeRequestVictim := flag.String("fakeRequestVictim", "", "Spam 10.4.32.1 with fake filter requests for the given IP.")
 	flag.Parse()
 
 	switch *modeStr {
@@ -26,6 +28,10 @@ func main() {
 	}
 
 	go listenForRouteRecords(*sendRequests)
+
+	if *fakeRequestVictim != "" {
+		go sendFakeRequests(net.ParseIP(*fakeRequestVictim), net.ParseIP("10.4.32.1"))
+	}
 
 	select {}
 }

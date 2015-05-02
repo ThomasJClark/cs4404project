@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"log"
 	"net"
+	"time"
+
+	"code.google.com/p/gopacket/layers"
 
 	"github.com/ThomasJClark/cs4404project/aitf"
 	"github.com/ThomasJClark/cs4404project/aitf/filter"
+	"github.com/ThomasJClark/cs4404project/aitf/routerecord"
 )
 
 type complianceMode int
@@ -81,5 +85,35 @@ func listenForFilterRequest(mode complianceMode) {
 			/*Hosts shouldn't get any of the other message types.*/
 			log.Println("Unexpected filter request:", req)
 		}
+	}
+}
+
+/*
+Spam cleverly-constructed fake filter requests to block "from". These should be
+dropped by the router, as they do not have legitimate nonces.
+*/
+func sendFakeRequests(from, to net.IP) {
+	req := filter.Request{
+		Type:  filter.FilterReq,
+		SrcIP: to,
+		DstIP: from,
+		Flow: routerecord.RouteRecord{
+			Protocol: byte(layers.IPProtocolTCP),
+			Path: []routerecord.Router{
+				{
+					IP:    net.ParseIP("10.4.32.3"),
+					Nonce: [8]byte{5, 5, 5, 5, 5, 5, 5, 5},
+				},
+				{
+					IP:    net.ParseIP("10.4.32.2"),
+					Nonce: [8]byte{1, 2, 3, 4, 5, 6, 7, 8},
+				},
+			},
+		},
+	}
+
+	for _ = range time.Tick(time.Second) {
+		log.Println("Sending illigitimate filter request:", req)
+		req.Send(req.Flow.Path[0].IP)
 	}
 }
