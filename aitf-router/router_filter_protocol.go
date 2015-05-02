@@ -59,11 +59,14 @@ func listenForFilterRequest() {
 		switch req.Type {
 		case filter.FilterReq:
 			/*When we receive a filter request, install a temporary filter and begin
-			a counter-connection with the attacker's router.*/
+			a counter-connection with the attacker's router. Also let the victim know
+			that the attack should have stopped with a filter ACK.*/
 			filter.InstallFilter(req, filter.TemporaryFilterTime, true)
 
 			req.Type = filter.CounterConnectionSyn
 			req.Send(req.Flow.Path[0].IP)
+			req.Type = filter.FilterAck
+			req.Send(addr.IP)
 
 		case filter.CounterConnectionSyn:
 			/*When we get a counter-connection SYN, continue the three-way handshake

@@ -59,7 +59,8 @@ func listenForFilterRequest(mode complianceMode) {
 		}
 
 		log.Println("Got", req.Type, "from", aitf.Hostname(addr.IP))
-		if req.Type == filter.FilterReq {
+		switch req.Type {
+		case filter.FilterReq:
 			switch mode {
 			case comply:
 				log.Println("Complying with filter request...")
@@ -81,7 +82,12 @@ func listenForFilterRequest(mode complianceMode) {
 				req.Type = filter.FilterAck
 				req.Send(addr.IP)
 			}
-		} else {
+
+		case filter.FilterAck:
+			/*Do nothing.  The routers should take care of mitigating the attack from
+			now on.*/
+
+		default:
 			/*Hosts shouldn't get any of the other message types.*/
 			log.Println("Unexpected filter request:", req)
 		}
