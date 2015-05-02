@@ -34,43 +34,40 @@ asynchronously.
 func InstallFilter(req Request, d time.Duration, forward bool) {
 	log.Printf("Adding filter: [%s to %s] for %s", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP), d)
 
-	/*Run the iptables command to add the filter in a goroutine so we don't
-	block until it finishes.*/
+	/*Run the iptables command to add the filter*/
+	var target string
+	if forward {
+		target = "FORWARD"
+	} else {
+		target = "OUTPUT"
+	}
+
+	add := exec.Command("iptables",
+		"-I", target,
+		"-s", fmt.Sprintf("%s/32", req.SrcIP),
+		"-d", fmt.Sprintf("%s/32", req.DstIP),
+		"-j", "DROP")
+
+	remove := exec.Command("iptables",
+		"-D", target,
+		"-s", fmt.Sprintf("%s/32", req.SrcIP),
+		"-d", fmt.Sprintf("%s/32", req.DstIP),
+		"-j", "DROP")
+
+	err := add.Run()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	/*Uninstall the filter after sleeping for d*/
 	go func() {
-		var target string
-		if forward {
-			target = "FORWARD"
-		} else {
-			target = "OUTPUT"
-		}
-
-		add := exec.Command("iptables",
-			"-I", target,
-			"-s", fmt.Sprintf("%s/32", req.SrcIP),
-			"-d", fmt.Sprintf("%s/32", req.DstIP),
-			"-j", "DROP")
-
-		remove := exec.Command("iptables",
-			"-D", target,
-			"-s", fmt.Sprintf("%s/32", req.SrcIP),
-			"-d", fmt.Sprintf("%s/32", req.DstIP),
-			"-j", "DROP")
-
-		err := add.Run()
-		if err != nil {
-			log.Println(err)
+		time.Sleep(d)
+		if remove.Run() == nil {
+			log.Println("Filter timed out.")
+			log.Printf("Removing filter: [%s to %s]", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP))
 			return
 		}
-
-		/*Uninstall the filter after sleeping for d*/
-		go func() {
-			time.Sleep(d)
-			if remove.Run() == nil {
-				log.Println("Filter timed out.")
-				log.Printf("Removing filter: [%s to %s]", aitf.Hostname(req.SrcIP), aitf.Hostname(req.DstIP))
-				return
-			}
-		}()
 	}()
 }
 
