@@ -60,8 +60,10 @@ func listenForFilterRequest() {
 		case filter.FilterReq:
 			/*When we receive a filter request, install a temporary filter and begin
 			a counter-connection with the attacker's router. Also let the victim know
-			that the attack should have stopped with a filter ACK.*/
-			filter.InstallFilter(req, filter.TemporaryFilterTime, true)
+			that the attack should have stopped with a filter ACK. The filter is
+			installed for the full filter time instead of the temporary time, but is
+			automatically removed when we get a filter ACK.*/
+			filter.InstallFilter(req, filter.LongFilterTime, true)
 
 			req.Type = filter.CounterConnectionSyn
 			req.Send(req.Flow.Path[0].IP)
@@ -95,7 +97,9 @@ func listenForFilterRequest() {
 				delete(handshakes, req.Nonce)
 			}
 
-			filter.InstallFilter(req, filter.TemporaryFilterTime, true)
+			/*The filter is installed for the full filter time instead of the
+			temporary time, but is automatically removed when we get a filter ACK.*/
+			filter.InstallFilter(req, filter.LongFilterTime, true)
 
 			/*The attacker should be informed of its wrongdoing, and the victim's
 			router should be informed that this router is complying with the
