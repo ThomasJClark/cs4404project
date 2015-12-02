@@ -16,15 +16,15 @@ func main() {
 	flag.Parse()
 
 	switch *modeStr {
-	case "comply":
-		log.Println("Complying with filtering requests.")
-		go listenForFilterRequest(comply)
 	case "ignore":
 		log.Println("Ignoring filtering requests.")
 		go listenForFilterRequest(ignore)
 	case "lie":
 		log.Println("Pretending to comply with filtering requests.")
 		go listenForFilterRequest(lie)
+	default:
+		log.Println("Complying with filtering requests.")
+		go listenForFilterRequest(comply)
 	}
 
 	go listenForRouteRecords(*sendRequests)

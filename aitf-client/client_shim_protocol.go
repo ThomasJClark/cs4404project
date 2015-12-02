@@ -18,6 +18,8 @@ If listenForRouteRecords is true, it also sends filter requests whenever an
 ICMP packet from 10.4.32.4 arrives.
 */
 func listenForRouteRecords(sendFilterRequests bool) {
+	routerecord.Init()
+
 	nfq, err := netfilter.NewNFQueue(0, 100000, 0xffff)
 	if err != nil {
 		log.Fatal(err)
@@ -39,6 +41,7 @@ func listenForRouteRecords(sendFilterRequests bool) {
 			/*If the IP layer has a shim, remove it.*/
 			log.Println("Got AITF shimmed packet from", aitf.Hostname(ipLayer.SrcIP))
 			rr := routerecord.Unshim(ipLayer)
+			log.Println(rr)
 
 			if sendFilterRequests {
 				/*If this is a malicious packet, construct a filter request to stop any

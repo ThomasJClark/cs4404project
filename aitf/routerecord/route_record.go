@@ -5,11 +5,13 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"io"
+	"math/rand"
 	"net"
+	"time"
 )
 
 var (
-	key     = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	key     = make([]byte, 8)
 	macFunc = hmac.New(sha1.New, key)
 )
 
@@ -36,6 +38,15 @@ router to verify that the record is genuine.
 type Router struct {
 	IP    net.IP
 	Nonce [8]byte
+}
+
+func Init() {
+	/*Randomly generate a key. In practice, this should be re-done periodically,
+	but this is unnecessary for this implemenation.*/
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := 0; i < len(key); i++ {
+		key[i] = byte(rand.Int())
+	}
 }
 
 /*
